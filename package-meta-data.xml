@@ -1,0 +1,13 @@
+<ncs-package xmlns="http://tail-f.com/ns/ncs-packages">
+  <name>svi_verify_example</name>
+  <package-version>1.0</package-version>
+  <description>Generated Python package</description>
+  <ncs-min-version>5.3</ncs-min-version>
+
+  <component>
+    <name>main</name>
+    <application>
+      <python-class-name>svi_verify_example.main.Main</python-class-name>
+    </application>
+  </component>
+</ncs-package>

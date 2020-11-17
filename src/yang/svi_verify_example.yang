@@ -1,0 +1,79 @@
+module svi_verify_example {
+
+  namespace "http://example.com/svi_verify_example";
+  prefix svi_verify_example;
+
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import tailf-common {
+    prefix tailf;
+  }
+  import tailf-ncs {
+    prefix ncs;
+  }
+
+  description
+    "Bla bla...";
+
+  revision 2016-01-01 {
+    description
+      "Initial revision.";
+  }
+
+  list svi_verify_example {
+    description "This is an RFS skeleton service";
+
+    key name;
+    leaf name {
+      tailf:info "Unique service id";
+      tailf:cli-allow-range;
+      type string;
+    }
+
+    uses ncs:service-data;
+    ncs:servicepoint svi_verify_example-servicepoint;
+
+    // may replace this with other ways of refering to the devices.
+    // leaf-list device {
+    //   type leafref {
+    //     path "/ncs:devices/ncs:device/ncs:name";
+    //   }
+    // }
+
+  
+   list switches {
+        key "id";
+        leaf id{
+          tailf:info "Switches identifier";
+          type string;
+        }
+        leaf switch-device {
+          mandatory true;
+          type leafref {
+            path "/ncs:devices/ncs:device/ncs:name";
+          }
+        }
+      }
+   list firewalls {
+        key "id";
+        leaf id{
+          tailf:info "firewalls identifier";
+          type string;
+        }
+        leaf firewall-device {
+          mandatory true;
+          type leafref {
+            path "/ncs:devices/ncs:device/ncs:name";
+          }
+        }
+      }
+
+
+
+    // // replace with your own stuff here
+    // leaf dummy {
+    //   type inet:ipv4-address;
+    // }
+  }
+}

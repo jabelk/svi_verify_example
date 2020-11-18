@@ -330,6 +330,8 @@ developer@ncs#
 
 This Learn by Doing example is not so much about the service design, but the integration of verification. As such, the Yang and Templates are relatively simple, reusing concepts from previous Learn by Doing repos.
 
+> I originally created this package with the expecation I would write my own health checks, so there is skeleton Python code in the `python` directory. It was not used, since I ended up using the `selftest` package. 
+
 The configuration template loops over each device in the switch and firewall device list, with some basic inputs for VLAN ID and VLAN Name to be consistent between the firewalls and switches. The IP Addresses are static for the sake of development time, and keeping the example simple. They should be replaced with more sophisticated inputs if that is desired:
 
 ```xml

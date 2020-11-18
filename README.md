@@ -519,10 +519,25 @@ The package uses the NSO `live-status` functionality to send commands to devices
 
 
 ```
-selftest svi-tests service /svi_verify_example[name='first-instance']
 ping 172.16.107.2 (which should pass)
 show ip interface brief (which should show our SVI)
 ping 172.16.110.2 (which should fail)
 ```
 
 The package checks to see if certain `failstring`s are present, for the ping test that was easy. For the `show ip interface brief`, we want to see that something is present for it succeed (the SVI being there is good), so it will always pass, but it gives us a record of the output to see the SVI is there. 
+
+The pass and fail records are visible in our service because we have linked them together with the `uses` statement:
+
+```
+developer@ncs# show svi_verify_example selftest-result
+NAME            NAME           RESULT  TIME
+------------------------------------------------------------
+first-instance  ping-test      OK      2020-11-17 15:19:52
+                sh-ip-int-br   OK      2020-11-17 15:19:52
+                sh-ip-test     OK      2020-11-17 15:14:23
+                test-svi-fail  FAIL    2020-11-17 15:20:05
+
+developer@ncs#
+```
+
+Note that the `test-svi-fail` test which was designed to fail, did indeed fail since the IP address `172.16.110.2` was not provisioned for this service, but the `172.16.107.2` one was and it passed. 

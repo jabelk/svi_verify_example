@@ -1,94 +1,75 @@
 <config-template xmlns="http://tail-f.com/ns/config/1.0">
- 
-       <!--
   <devices xmlns="http://tail-f.com/ns/ncs">
+    <?foreach {/switches}?>
     <device>
-
-          Select the devices from some data structure in the service
-          model. In this skeleton the devices are specified in a leaf-list.
-          Select all devices in that leaf-list:
-      <name>{/device}</name>
+      <name>{switch-device}</name>
       <config>
-            Add device-specific parameters here.
-            In this skeleton the, java code sets a variable DUMMY, use it
-            to set something on the device e.g.:
-            <ip-address-on-device>{$DUMMY}</ip-address-on-device>   
+        <vlan xmlns="http://tail-f.com/ned/cisco-nx">
+          <vlan-list>
+            <id>{/vlan-id}</id>
+            <name>{/vlan-name}</name>
+          </vlan-list>
+        </vlan>
+        <interface xmlns="http://tail-f.com/ned/cisco-nx">
+          <Vlan>
+            <name>{/vlan-id}</name>
+            <description>{/vlan-name}</description>
+            <ip>
+              <address>
+                <ipaddr>172.16.107.2/24</ipaddr>
+              </address>
+              <redirects>false</redirects>
+              <router>
+                <ospf>
+                  <name>1</name>
+                  <area>0.0.0.0</area>
+                </ospf>
+              </router>
+            </ip>
+            <ipv6>
+              <redirects>false</redirects>
+            </ipv6>
+            <hsrp>
+              <hsrp-list>
+                <id>10</id>
+                <addr_type>ipv4</addr_type>
+                <ip>
+                  <address>172.16.107.1</address>
+                </ip>
+              </hsrp-list>
+            </hsrp>
+          </Vlan>
+        </interface>
       </config>
     </device>
+    <?end?>    <!-- end foreach {/endpoint} -->
   </devices>
-      -->
+
 
   <devices xmlns="http://tail-f.com/ns/ncs">
-        <?foreach {/switches}?>
-               <device>
-                 <name>{switch-device}</name>
-                 <config>
-                   <vlan xmlns="http://tail-f.com/ned/cisco-nx">
-                     <vlan-list>
-                       <id>1337</id>
-                       <name>service-test</name>
-                     </vlan-list>
-                   </vlan>
-                   <interface xmlns="http://tail-f.com/ned/cisco-nx">
-                     <Vlan>
-                       <name>1337</name>
-                       <description>service-test</description>
-                       <ip>
-                         <address>
-                           <ipaddr>172.16.107.2/24</ipaddr>
-                         </address>
-                         <redirects>false</redirects>
-                         <router>
-                           <ospf>
-                             <name>1</name>
-                             <area>0.0.0.0</area>
-                           </ospf>
-                         </router>
-                       </ip>
-                       <ipv6>
-                         <redirects>false</redirects>
-                       </ipv6>
-                       <hsrp>
-                         <hsrp-list>
-                           <id>10</id>
-                           <addr_type>ipv4</addr_type>
-                           <ip>
-                             <address>172.16.107.1</address>
-                           </ip>
-                         </hsrp-list>
-                       </hsrp>
-                     </Vlan>
-                   </interface>
-                 </config>
-               </device>
-              <?end?> <!-- end foreach {/endpoint} -->
-             </devices>
-
-
-<devices xmlns="http://tail-f.com/ns/ncs">
-        <?foreach {/firewalls}?>
-               <device>
-                 <name>{firewall-device}</name>
-                 <config>
-                   <object xmlns="http://cisco.com/ned/asa">
-                     <network>
-                       <name>INSIDE-SERVICE-TEST</name>
-                       <subnet>
-                         <address>172.16.107.0</address>
-                         <mask>255.255.255.0</mask>
-                       </subnet>
-                     </network>
-                   </object>
-                   <object-group xmlns="http://cisco.com/ned/asa">
-                     <network>
-                       <id>INSIDE-NETWORKS</id>
-                       <network-object>
-                         <id>object INSIDE-SERVICE-TEST</id>
-                       </network-object>
-                     </network>
-                   </object-group>
-                 </config>
-               </device>
-              <?end?> <!-- end foreach {/endpoint} -->
-             </devices>
+    <?foreach {/firewalls}?>
+    <device>
+      <name>{firewall-device}</name>
+      <config>
+        <object xmlns="http://cisco.com/ned/asa">
+          <network>
+            <name>INSIDE-{/vlan-name}</name>
+            <subnet>
+              <address>172.16.107.0</address>
+              <mask>255.255.255.0</mask>
+            </subnet>
+          </network>
+        </object>
+        <object-group xmlns="http://cisco.com/ned/asa">
+          <network>
+            <id>INSIDE-NETWORKS</id>
+            <network-object>
+              <id>object INSIDE-{/vlan-name}</id>
+            </network-object>
+          </network>
+        </object-group>
+      </config>
+    </device>
+    <?end?>    <!-- end foreach {/endpoint} -->
+  </devices>
 </config-template>

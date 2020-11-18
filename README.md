@@ -1,4 +1,4 @@
-# Learn by Doing: Service Template Conditionals
+# Learn by Doing: Service Health Verification & Importing Packages
 
 NSO has a ton of features. This repository is the first of a series which will show a simple use case, along with a feature. The purpose is dual:
 
@@ -7,11 +7,12 @@ NSO has a ton of features. This repository is the first of a series which will s
 
 This example is a service package deploying:
 
-**NTP Configuration**
+**SVI Configuration**
 
-and the feature I am showcasing is:
+and the features I am showcasing are:
 
-**Service Template XML Conditionals**
+**Service Health Verifications**
+**Importing Packages**
 
 This example assumes a working knowledge of services and NSO. 
 
@@ -23,7 +24,9 @@ If you need to revisit some of the NSO Basics, you can [start here](https://deve
 
 Use some type of file transfer program or [VS Code has remote SSH](https://code.visualstudio.com/docs/remote/ssh) (drag and drop the package into the packages directory)
 
-This repo should go here:
+This project requires **two** repos. The first is this one **(svi_verify_example)**. The second is the **[selftest package](https://github.com/NSO-developer/selftest)**.
+
+Both packages should go here:
 
 `/var/opt/ncs/packages/`
 
@@ -37,36 +40,53 @@ Nexus9000 9.2(3)
 ASAv 9.12(2)
 ```
 
-After the package is on the configured NSO system install server (10.10.20.49) at the packages folder, make sure the yang is compiled reload packages and configure some sample service instances:
+After both packages are on the configured NSO system install server (10.10.20.49) at the packages folder, make sure the yang is compiled reload packages and configure a sample service instance and sample verification.
+
+### Configure service
+
+First, you will need to compile the yang and reload the packages, then create a service instance of the SVI package:
 
 ```
-** transfer package over **
+** transfer selftest AND svi_verify_example package over **
 cd /var/opt/ncs/packages/svi_verify_example/src
+make
+cd /var/opt/ncs/packages/selftest/src
 make
 ncs_cli
 packages reload
 conf
-ntp_server_example first-instance endpoint 1st-dev ntp-device dist-rtr01
-commit dry-run outformat native
-region AMER
-commit dry-run outformat native
+svi_verify_example first-instance vlan-id 1337 vlan-name SVI-DEMO switches first-sw switch-device dist-sw01
 exit
-endpoint 2nd-dev ntp-device dist-rtr02 region APJC
+switches second-sw switch-device dist-sw02
 exit
-endpoint 3rd-dev ntp-device core-rtr01 region AMER
+firewalls first-fw firewall-device edge-firewall01
 exit
-endpoint 4th-dev ntp-device core-rtr02 region EMEA
-exit
-endpoint 5th-dev ntp-device dist-sw01 region AMER
-exit
-endpoint 6th-dev ntp-device dist-sw02 region APJC
-exit
-endpoint 7th-dev ntp-device edge-sw01 region EMEA
-exit
-endpoint 8th-dev ntp-device internet-rtr01 region AMER
 commit dry-run outformat native
 commit
+end
 ```
+
+### Configure and run selftest
+
+After the service instance is deployed and committed, you can populate and run selftest. This will be explained after the output section. 
+
+```
+show running-config svi_verify_example first-instance | display xpath
+conf
+selftest svi-tests service /svi_verify_example[name='first-instance']
+commands ping-test command ping arguments 172.16.107.2 failstring "No route to host" devices dist-sw01
+exit
+commands sh-ip-int-br command show arguments "ip interface brief" devices dist-sw01
+exit
+commands test-svi-fail command ping arguments 172.16.110.2 devices dist-sw01 failstring "No route to host"
+top
+commit
+selftest svi-tests execute
+end
+show svi_verify_example selftest-result
+```
+
+### Sample Output for SVI Service
 
 here is some sample output:
 
@@ -144,51 +164,12 @@ developer@ncs#
 developer@ncs#
 developer@ncs# conf
 Entering configuration mode terminal
-developer@ncs(config)# svi_verify_example first-instance vlan-id 1337 vlan-name SVI-DEMO switches first-sw switch-device dist-sw01 ?
-Possible completions:
-  <cr>
 developer@ncs(config)# svi_verify_example first-instance vlan-id 1337 vlan-name SVI-DEMO switches first-sw switch-device dist-sw01
 developer@ncs(config-switches-first-sw)# exit
 developer@ncs(config-svi_verify_example-first-instance)# switches second-sw switch-device dist-sw02
-developer@ncs(config-switches-second-sw)# ?
-Possible completions:
-  switch-device
-  ---
-  commit          Commit current set of changes
-  describe        Display transparent command information
-  exit            Exit from current mode
-  help            Provide help information
-  no              Negate a command or set its defaults
-  pwd             Display current mode path
-  rload           Load configuration from an ASCII file relative to current location
-  top             Exit to top level and optionally run command
 developer@ncs(config-switches-second-sw)# exit
 developer@ncs(config-svi_verify_example-first-instance)# firewalls first-fw firewall-device edge-firewall01
 developer@ncs(config-firewalls-first-fw)# exit
-developer@ncs(config-svi_verify_example-first-instance)# ?
-Possible completions:
-  check-sync           Check if device config is according to the service
-  commit-queue
-  deep-check-sync      Check if device config is according to the service
-  firewalls
-  get-modifications    Get the data this service created
-  log
-  re-deploy            Run/Dry-run the service logic again
-  reactive-re-deploy   Reactive re-deploy of service logic
-  switches
-  touch                Mark the service as changed
-  un-deploy            Undo the effects of the service
-  vlan-id
-  vlan-name
-  ---
-  commit               Commit current set of changes
-  describe             Display transparent command information
-  exit                 Exit from current mode
-  help                 Provide help information
-  no                   Negate a command or set its defaults
-  pwd                  Display current mode path
-  rload                Load configuration from an ASCII file relative to current location
-  top                  Exit to top level and optionally run command
 developer@ncs(config-svi_verify_example-first-instance)# commit dry-run outformat native
 native {
     device {
@@ -238,216 +219,17 @@ native {
 developer@ncs(config-svi_verify_example-first-instance)# commit
 Commit complete.
 developer@ncs(config-svi_verify_example-first-instance)# end
-developer@ncs# show running-config svi_verify_example ?
-Possible completions:
-  first-instance   Unique service id
-  |                Output modifiers
-  <cr>
-Possible match completions:
-  firewalls  switches  vlan-id  vlan-name
-developer@ncs# show running-config svi_verify_example fir
-Possible completions:
-  first-instance   Unique service id
-Possible match completions:
-  firewalls
+```
+
+## Verifying with the custom Selftest package
+
+```
 developer@ncs# show running-config svi_verify_example first-instance | display xpath
 /svi_verify_example[name='first-instance']/switches[id='first-sw']/switch-device dist-sw01
 /svi_verify_example[name='first-instance']/switches[id='second-sw']/switch-device dist-sw02
 /svi_verify_example[name='first-instance']/firewalls[id='first-fw']/firewall-device edge-firewall01
 /svi_verify_example[name='first-instance']/vlan-id 1337
 /svi_verify_example[name='first-instance']/vlan-name SVI-DEMO
-developer@ncs# conf
-Entering configuration mode terminal
-developer@ncs(config)# selftest test-svi-ping service /svi_verify_example[name='first-instance']
-developer@ncs(config-selftest-test-svi-ping)# ?
-Possible completions:
-  commands
-  execute
-  service    Path to the service where the selftest result will be stored
-  ---
-  commit     Commit current set of changes
-  describe   Display transparent command information
-  exit       Exit from current mode
-  help       Provide help information
-  no         Negate a command or set its defaults
-  pwd        Display current mode path
-  rload      Load configuration from an ASCII file relative to current location
-  top        Exit to top level and optionally run command
-developer@ncs(config-selftest-test-svi-ping)# comm
-Possible completions:
-  commands
-  ---
-  commit     Commit current set of changes
-developer@ncs(config-selftest-test-svi-ping)# commands ?
-Possible completions:
-  <name:string>
-developer@ncs(config-selftest-test-svi-ping)# commands ping-test ?
-Possible completions:
-  arguments
-  command
-  devices
-  failstring   regular expression for a fail result
-  <cr>
-developer@ncs(config-selftest-test-svi-ping)# commands ping-test command ?
-Possible completions:
-  any  copy  nonconfig-actions  ping  show
-developer@ncs(config-selftest-test-svi-ping)# commands ping-test command ping arguments 172.16.107.2 failstring "No route to host"
-Value for 'devices' (list): dist-sw01
-developer@ncs(config-commands-ping-test)# top
-developer@ncs(config)# selftest test-svi-fail service /svi_verify_example[name='first-instance']
-developer@ncs(config-selftest-test-svi-fail)# commands ping-test command ping arguments 172.16.110.2 failstring "No route to host"
-Value for 'devices' (list): dist-sw01
-developer@ncs(config-commands-ping-test)# top
-developer@ncs(config)# selftest test-svi-sh-ip service /svi_verify_example[name='first-instance']
-developer@ncs(config-selftest-test-svi-sh-ip)# commands sh-ip-test command show arguments "interface vlan" devices dist-sw01
-developer@ncs(config-commands-sh-ip-test)# top
-developer@ncs(config)# commit
-Commit complete.
-developer@ncs(config)# sefl
-                       ^
-% Invalid input detected at '^' marker.
-developer@ncs(config)# selftest ?
-This line doesn't have a valid range expression
-Possible completions:
-  <name:string>  test-svi-fail  test-svi-ping  test-svi-sh-ip
-developer@ncs(config)# selftest test-svi-ping execute
-result
-output from ping
-device: dist-sw01
-
-PING 172.16.107.2 (172.16.107.2): 56 data bytes
-64 bytes from 172.16.107.2: icmp_seq=0 ttl=255 time=1.578 ms
-64 bytes from 172.16.107.2: icmp_seq=1 ttl=255 time=0.712 ms
-64 bytes from 172.16.107.2: icmp_seq=2 ttl=255 time=1.763 ms
-64 bytes from 172.16.107.2: icmp_seq=3 ttl=255 time=2.195 ms
-64 bytes from 172.16.107.2: icmp_seq=4 ttl=255 time=0.996 ms
-
---- 172.16.107.2 ping statistics ---
-5 packets transmitted, 5 packets received, 0.00% packet loss
-round-trip min/avg/max = 0.712/1.448/2.195 ms
-
-developer@ncs(config)# selftest test-svi-fail execute
-result
-output from ping
-device: dist-sw01
-
-PING 172.16.110.2 (172.16.110.2): 56 data bytes
-ping: sendto 172.16.110.2 64 chars, No route to host
-Request 0 timed out
-ping: sendto 172.16.110.2 64 chars, No route to host
-Request 1 timed out
-ping: sendto 172.16.110.2 64 chars, No route to host
-Request 2 timed out
-ping: sendto 172.16.110.2 64 chars, No route to host
-Request 3 timed out
-ping: sendto 172.16.110.2 64 chars, No route to host
-Request 4 timed out
-
---- 172.16.110.2 ping statistics ---
-5 packets transmitted, 0 packets received, 100.00% packet loss
-
-developer@ncs(config)# selftest test-svi-
-Possible completions:
-  test-svi-fail  test-svi-ping  test-svi-sh-ip
-developer@ncs(config)# selftest test-svi-sh-ip execute
-result
-output from show
-device: dist-sw01
-
-                              ^
-Invalid command (incomplete interface) at '^' marker.
-
-developer@ncs(config)# selftest test-svi-sh-ip ?
-Possible completions:
-  commands
-  execute
-  service    Path to the service where the selftest result will be stored
-  <cr>
-developer@ncs(config)# selftest test-svi-sh-ip commands ?
-This line doesn't have a valid range expression
-Possible completions:
-  <name:string>  sh-ip-test
-developer@ncs(config)# selftest test-svi-sh-ip commands sh-ip-test ?
-Possible completions:
-  arguments
-  command
-  devices
-  failstring   regular expression for a fail result
-  <cr>
-developer@ncs(config)# selftest test-svi-sh-ip commands sh-ip-test ?
-Possible completions:
-  arguments
-  command
-  devices
-  failstring   regular expression for a fail result
-  <cr>
-developer@ncs(config)# selftest test-svi-sh-ip commands sh-ip-test command ?
-Possible completions:
-  [show]  any  copy  nonconfig-actions  ping  show
-developer@ncs(config)# selftest test-svi-sh-ip commands sh-ip-test command show ?
-Possible completions:
-  arguments
-  devices
-  failstring   regular expression for a fail result
-  <cr>
-developer@ncs(config)# selftest test-svi-sh-ip commands sh-ip-test command show arguments ?
-Possible completions:
-  <string>[interface vlan]
-developer@ncs(config)# selftest test-svi-sh-ip commands sh-ip-test command show arguments "ip interface brief"
-developer@ncs(config-commands-sh-ip-test)# top
-developer@ncs(config)# commit
-Commit complete.
-developer@ncs(config)# selftest test-svi-sh-ip ?
-Possible completions:
-  commands
-  execute
-  service    Path to the service where the selftest result will be stored
-  <cr>
-developer@ncs(config)# selftest test-svi-sh-ip execute
-result
-output from show
-device: dist-sw01
-
-
-IP Interface Status for VRF "default"(1)
-Interface            IP Address      Interface Status
-Vlan101              172.16.101.2    protocol-up/link-up/admin-up
-Vlan102              172.16.102.2    protocol-up/link-up/admin-up
-Vlan103              172.16.103.2    protocol-up/link-up/admin-up
-Vlan104              172.16.104.2    protocol-up/link-up/admin-up
-Vlan105              172.16.105.2    protocol-up/link-up/admin-up
-Vlan1337             172.16.107.2    protocol-up/link-up/admin-up
-Eth1/3               172.16.252.1    protocol-up/link-up/admin-up
-Eth1/4               172.16.252.5    protocol-up/link-up/admin-up
-
-developer@ncs(config)# end
-developer@ncs# show running-config selftest
-selftest test-svi-fail
- service /svi_verify_example[name='first-instance']
- commands ping-test
-  devices    [ dist-sw01 ]
-  command    ping
-  arguments  172.16.110.2
-  failstring "No route to host"
- !
-!
-selftest test-svi-ping
- service /svi_verify_example[name='first-instance']
- commands ping-test
-  devices    [ dist-sw01 ]
-  command    ping
-  arguments  172.16.107.2
-  failstring "No route to host"
- !
-!
-selftest test-svi-sh-ip
- service /svi_verify_example[name='first-instance']
- commands sh-ip-test
-  devices   [ dist-sw01 ]
-  command   show
-  arguments "ip interface brief"
- !
-!
 developer@ncs# conf
 Entering configuration mode terminal
 developer@ncs(config)# selftest svi-tests ?
@@ -457,9 +239,6 @@ Possible completions:
   service    Path to the service where the selftest result will be stored
   <cr>
 developer@ncs(config)# selftest svi-tests service /svi_verify_example[name='first-instance']
-developer@ncs(config-selftest-svi-tests)# dev
-                                          ^
-% Invalid input detected at '^' marker.
 developer@ncs(config-selftest-svi-tests)# commands ?
 Possible completions:
   <name:string>
@@ -470,70 +249,10 @@ Possible completions:
   devices
   failstring   regular expression for a fail result
   <cr>
-developer@ncs(config-selftest-svi-tests)# commands ping-test command ping 172.16.107.2 no
-                                                                          ^
-% Invalid input detected at '^' marker.
-developer@ncs(config-selftest-svi-tests)# commands ping-test command ping 172.16.107.2 ar
-                                                                          ^
-% Invalid input detected at '^' marker.
-developer@ncs(config-selftest-svi-tests)# commands ping-test command ping 172.16.107.2 fa
-                                                                          ^
-% Invalid input detected at '^' marker.
-developer@ncs(config-selftest-svi-tests)# commands ping-test command ping arguments 172.16.107.2 failstring "No route to host"
-Value for 'devices' (list):
-Error: user aborted
 developer@ncs(config-selftest-svi-tests)# commands ping-test command ping arguments 172.16.107.2 failstring "No route to host" devices dist-sw01
 developer@ncs(config-commands-ping-test)# exit
-developer@ncs(config-selftest-svi-tests)# comm
-Possible completions:
-  commands
-  ---
-  commit     Commit current set of changes
-developer@ncs(config-selftest-svi-tests)# commands sh-ip-int-br ?
-Possible completions:
-  arguments
-  command
-  devices
-  failstring   regular expression for a fail result
-  <cr>
-developer@ncs(config-selftest-svi-tests)# commands sh-ip-int-br command show "ip interface brief" dev
-                                                                             ^
-% Invalid input detected at '^' marker.
-developer@ncs(config-selftest-svi-tests)# commands sh-ip-int-br command show arguments ?
-Possible completions:
-  <string>
-developer@ncs(config-selftest-svi-tests)# commands sh-ip-int-br command show arguments "ip interface brief" devices dist-sw01 ?
-Possible completions:
-  failstring   regular expression for a fail result
-  <cr>
 developer@ncs(config-selftest-svi-tests)# commands sh-ip-int-br command show arguments "ip interface brief" devices dist-sw01
 developer@ncs(config-commands-sh-ip-int-br)# exit
-developer@ncs(config-selftest-svi-tests)# comm
-Possible completions:
-  commands
-  ---
-  commit     Commit current set of changes
-developer@ncs(config-selftest-svi-tests)# commands test-svi-fail ?
-Possible completions:
-  arguments
-  command
-  devices
-  failstring   regular expression for a fail result
-  <cr>
-developer@ncs(config-selftest-svi-tests)# commands test-svi-fail command ?
-Possible completions:
-  any  copy  nonconfig-actions  ping  show
-developer@ncs(config-selftest-svi-tests)# commands test-svi-fail command ping "172.16.110.2" dev
-                                                                              ^
-% Invalid input detected at '^' marker.
-developer@ncs(config-selftest-svi-tests)# commands test-svi-fail command ping arguments 172.16.110.2
-Possible completions:
-  devices
-  failstring   regular expression for a fail result
-  <cr>
-developer@ncs(config-selftest-svi-tests)# commands test-svi-fail command ping arguments 172.16.110.2 devices dist-sw01 failstring "No route to host" ?
-Possible completions:
-  <cr>
 developer@ncs(config-selftest-svi-tests)# commands test-svi-fail command ping arguments 172.16.110.2 devices dist-sw01 failstring "No route to host"
 developer@ncs(config-commands-test-svi-fail)# exit
 developer@ncs(config-selftest-svi-tests)# top
@@ -541,7 +260,7 @@ developer@ncs(config)# commit
 Commit complete.
 developer@ncs(config)# selftest
 Possible completions:
-  <name:string>  svi-tests  test-svi-fail  test-svi-ping  test-svi-sh-ip
+  <name:string>  svi-tests 
 developer@ncs(config)# selftest svi-tests execute
 result
 output from ping
@@ -592,9 +311,6 @@ Request 4 timed out
 5 packets transmitted, 0 packets received, 100.00% packet loss
 
 developer@ncs(config)# exit
-developer@ncs# show svi_verify_example te
-                                       ^
-% Invalid input detected at '^' marker.
 developer@ncs# show svi_verify_example selftest-result ?
 Description: last results for the service selftest action
 Possible completions:
@@ -610,208 +326,201 @@ first-instance  ping-test      OK      2020-11-17 15:19:52
 developer@ncs#
 ```
 
+## Service Design Considerations
+
+This Learn by Doing example is not so much about the service design, but the integration of verification. As such, the Yang and Templates are relatively simple, reusing concepts from previous Learn by Doing repos.
+
+The configuration template loops over each device in the switch and firewall device list, with some basic inputs for VLAN ID and VLAN Name to be consistent between the firewalls and switches. The IP Addresses are static for the sake of development time, and keeping the example simple. They should be replaced with more sophisticated inputs if that is desired:
+
+```xml
+<config-template xmlns="http://tail-f.com/ns/config/1.0">
+  <devices xmlns="http://tail-f.com/ns/ncs">
+        <?foreach {/switches}?>
+               <device>
+                 <name>{switch-device}</name>
+                 <config>
+                   <vlan xmlns="http://tail-f.com/ned/cisco-nx">
+                     <vlan-list>
+                       <id>{/vlan-id}</id>
+                       <name>{/vlan-name}</name>
+                     </vlan-list>
+                   </vlan>
+                   <interface xmlns="http://tail-f.com/ned/cisco-nx">
+                     <Vlan>
+                       <name>{/vlan-id}</name>
+                       <description>{/vlan-name}</description>
+                       <ip>
+                         <address>
+                           <ipaddr>172.16.107.2/24</ipaddr>
+                         </address>
+                         <redirects>false</redirects>
+                         <router>
+                           <ospf>
+                             <name>1</name>
+                             <area>0.0.0.0</area>
+                           </ospf>
+                         </router>
+                       </ip>
+                       <ipv6>
+                         <redirects>false</redirects>
+                       </ipv6>
+                       <hsrp>
+                         <hsrp-list>
+                           <id>10</id>
+                           <addr_type>ipv4</addr_type>
+                           <ip>
+                             <address>172.16.107.1</address>
+                           </ip>
+                         </hsrp-list>
+                       </hsrp>
+                     </Vlan>
+                   </interface>
+                 </config>
+               </device>
+              <?end?> <!-- end foreach {/endpoint} -->
+             </devices>
 
 
-## Service Template Conditional Statements
+<devices xmlns="http://tail-f.com/ns/ncs">
+        <?foreach {/firewalls}?>
+               <device>
+                 <name>{firewall-device}</name>
+                 <config>
+                   <object xmlns="http://cisco.com/ned/asa">
+                     <network>
+                       <name>INSIDE-{/vlan-name}</name>
+                       <subnet>
+                         <address>172.16.107.0</address>
+                         <mask>255.255.255.0</mask>
+                       </subnet>
+                     </network>
+                   </object>
+                   <object-group xmlns="http://cisco.com/ned/asa">
+                     <network>
+                       <id>INSIDE-NETWORKS</id>
+                       <network-object>
+                         <id>object INSIDE-{/vlan-name}</id>
+                       </network-object>
+                     </network>
+                   </object-group>
+                 </config>
+               </device>
+              <?end?> <!-- end foreach {/endpoint} -->
+             </devices>
+</config-template>
 
-The conditional statement example can be found in the NSO Development guide PDF with the installation, in the  chapter 11 section called `Conditional Statements`. 
-
-Basically conditional statements allow us to control which pieces of the configuration we want to exist or not, without using any Python/Java code. You will need to make some type of statement that evaluates to true or false. In our example we are checking to see which region the device is set to, and giving it that NTP server. 
-
-The configuration we want to filter looks like this:
 ```
-ntp server 10.20.30.40
-```
-Depending on which region our device sits, we want a different IP address for the server. 
 
-In this service package we have the following data model:
+The data model imports `selftest`, which is the custom verification package we downloaded and compiled. It also includes `uses selftest:selftest-result;` in the service so that we can store the operational values of the output in our service. 
+
 ```javascript
-module ntp_server_example {
-  namespace "http://com/example/ntp_server_example";
-  prefix ntp_server_example;
+module svi_verify_example {
+
+  namespace "http://example.com/svi_verify_example";
+  prefix svi_verify_example;
 
   import ietf-inet-types {
     prefix inet;
   }
-  import tailf-ncs {
-    prefix ncs;
-  }
   import tailf-common {
     prefix tailf;
   }
+  import tailf-ncs {
+    prefix ncs;
+  }
+  // assumes makefile has been updated
+  import selftest {
+    prefix selftest;
+  }
 
-  list ntp_server_example {
+
+  description
+    "Bla bla...";
+
+  revision 2016-01-01 {
+    description
+      "Initial revision.";
+  }
+
+  list svi_verify_example {
+    description "This is an RFS skeleton service";
+
     key name;
-
-    uses ncs:service-data;
-    ncs:servicepoint "ntp_server_example";
-
     leaf name {
+      tailf:info "Unique service id";
+      tailf:cli-allow-range;
       type string;
     }
-
-   list endpoint {
+    // gives us linkage to selftest
+    uses selftest:selftest-result;
+    uses ncs:service-data;
+    ncs:servicepoint svi_verify_example-servicepoint;
+  
+   list switches {
         key "id";
         leaf id{
-          tailf:info "Endpoint identifier";
+          tailf:info "Switches identifier";
           type string;
         }
-        leaf ntp-device {
+        leaf switch-device {
           mandatory true;
           type leafref {
             path "/ncs:devices/ncs:device/ncs:name";
           }
         }
-        leaf region {
-          type enumeration {
-            enum "AMER";
-            enum "APJC";
-            enum "EMEA";
+      }
+   list firewalls {
+        key "id";
+        leaf id{
+          tailf:info "firewalls identifier";
+          type string;
+        }
+        leaf firewall-device {
+          mandatory true;
+          type leafref {
+            path "/ncs:devices/ncs:device/ncs:name";
           }
         }
-
-
+      }
+      
+      leaf vlan-id {
+        type uint16;
+        mandatory true;
+      }
+      leaf vlan-name{
+        type string;
+        mandatory true;
       }
 
-
-    // // may replace this with other ways of refering to the devices.
-    // leaf-list device {
-    //   type leafref {
-    //     path "/ncs:devices/ncs:device/ncs:name";
-    //   }
-    // }
-
-    // // replace with your own stuff here
-    // leaf dummy {
-    //   type empty;
-    // }
   }
 }
-
 ```
 
-I replaced the single device leafref with a list of `endpoints` which leafref back to the device list, but also give us an additional leaf of `region` to tag each one with a region for the conditional to check against. 
+### Changes to Makefile
 
-Since NTP servers are on pretty much every device, and don't change often, they are usually lumped together with other static config. For the sake of simplicity and instruction of concepts, they are the only configuration this service is using. 
+In order for the SVI Service to include the Yang files of the `selftest` package, I changed the Makefile in the SVI service to include this statement
+```
+YANGPATH += ../../selftest/src/yang
+```
+This tells NSO to pull in the data models from the other package. Since we then imported it, and used it, we now can use this package's functionality in our package. 
 
-### Foreach Device Looping
 
-Even though this repo is focusing on conditionals, I took the opportunity to give an example of looping over a list of devices (`endpoint` list) in the template, so we could create one service instance that iterates over the `endpoint` list. 
+## Service Verification
 
-```xml
-<config-template xmlns="http://tail-f.com/ns/config/1.0"
-                 servicepoint="ntp_server_example">
-  <devices xmlns="http://tail-f.com/ns/ncs">
-      <?foreach {/endpoint}?>
-      <?set NTP_DEVICE={ntp-device}?>
-      <?set NTP_REGION={region}?>
-    <device>
-      <name>{$NTP_DEVICE}</name>
-      <config>
+There are multiple ways to verify a service health. You can include some Python actions, writing your own tests, or use some type of outside (not NSO) application to check on the health of the network. 
+
+In this case, we are reusing the framework package written by Hakan, in order to save development time and also demonstrate reusing another package in our own service. 
+
+The `selftest` package has a number of different features, but for our purposes, it is an easy to use wrapper around some Python code that allows us to define a list of verification operational commands to send, and some basic REGEX to see if there is a failure scenario in the output. 
+
+The package uses the NSO `live-status` functionality to send commands to devices. I picked a few commands to send, showing successful and relevant tests, as well as one test that fails on purpose. The commands I chose were:
+
+
+```
+selftest svi-tests service /svi_verify_example[name='first-instance']
+ping 172.16.107.2 (which should pass)
+show ip interface brief (which should show our SVI)
+ping 172.16.110.2 (which should fail)
 ```
 
-The `foreach` is referring to the `endpoint` list in the yang, and I also used the ability to set local variable names, just to illustrate the functionality `<?set NTP_DEVICE={ntp-device}?>`. So when the template runs, it will loop over each device and take the device name and set it to a new variable and set the associated region to a variable. 
-
-### Conditionals
-
-The template looks like as follows:
-
-```xml
-<config-template xmlns="http://tail-f.com/ns/config/1.0"
-                 servicepoint="ntp_server_example">
-  <devices xmlns="http://tail-f.com/ns/ncs">
-      <?foreach {/endpoint}?>
-      <?set NTP_DEVICE={ntp-device}?>
-      <?set NTP_REGION={region}?>
-    <device>
-      <name>{$NTP_DEVICE}</name>
-      <config>
-        <!--
-        AMER NTP Servers
-        -->
-        <?if {contains($NTP_REGION, 'AMER')}?>
-          <ntp xmlns="urn:ios">
-            <server>
-              <peer-list>
-                <name>10.20.30.40</name>
-              </peer-list>
-            </server>
-          </ntp>
-
-          <ntp xmlns="http://tail-f.com/ned/cisco-ios-xr">
-            <server>
-              <server-list>
-                <name>10.20.30.40</name>
-              </server-list>
-            </server>
-          </ntp>
-          
-          <ntp xmlns="http://tail-f.com/ned/cisco-nx">
-            <server>
-              <id>10.20.30.40</id>
-            </server>
-          </ntp>
-         <?end?> <!-- end if -->
-        <!--
-        APJC NTP Servers
-        -->
-        <?if {contains($NTP_REGION, 'APJC')}?>
-          <ntp xmlns="urn:ios">
-            <server>
-              <peer-list>
-                <name>172.20.30.50</name>
-              </peer-list>
-            </server>
-          </ntp>
-
-          <ntp xmlns="http://tail-f.com/ned/cisco-ios-xr">
-            <server>
-              <server-list>
-                <name>172.20.30.50</name>
-              </server-list>
-            </server>
-          </ntp>
-          
-          <ntp xmlns="http://tail-f.com/ned/cisco-nx">
-            <server>
-              <id>172.20.30.50</id>
-            </server>
-          </ntp>
-         <?end?> <!-- end if -->
-        <!--
-        EMEA NTP Servers
-        -->
-        <?if {contains($NTP_REGION, 'EMEA')}?>
-          <ntp xmlns="urn:ios">
-            <server>
-              <peer-list>
-                <name>192.20.30.60</name>
-              </peer-list>
-            </server>
-          </ntp>
-          
-          <ntp xmlns="http://tail-f.com/ned/cisco-ios-xr">
-            <server>
-              <server-list>
-                <name>192.20.30.60</name>
-              </server-list>
-            </server>
-          </ntp>
-
-          <ntp xmlns="http://tail-f.com/ned/cisco-nx">
-            <server>
-              <id>192.20.30.60</id>
-            </server>
-          </ntp>
-         <?end?> <!-- end if -->
-      </config>
-    </device>
-    <?end?> <!-- end foreach {/endpoint} -->
-  </devices>
-</config-template>
-```
-
-I used the XPATH function `contains()` to check to see if the region was one of our three options. You can see common XPATH functions [here](https://developer.mozilla.org/en-US/docs/Web/XPath/Functions). If you look at the sample output in this README above, you will notice that the first commit dry run does not include a region on purpose, to show you that the check is working and no config is created. 
-
-Related to this discussion be careful of using a list key as a conditional check, [see this discussion](https://community.cisco.com/t5/nso-developer-hub-discussions/conditional-quot-if-quot-statement-is-not-working-as-expected/td-p/4019274)
-
+The package checks to see if certain `failstring`s are present, for the ping test that was easy. For the `show ip interface brief`, we want to see that something is present for it succeed (the SVI being there is good), so it will always pass, but it gives us a record of the output to see the SVI is there. 

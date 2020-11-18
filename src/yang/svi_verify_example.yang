@@ -12,6 +12,11 @@ module svi_verify_example {
   import tailf-ncs {
     prefix ncs;
   }
+  // assumes makefile has been updated
+  import selftest {
+    prefix selftest;
+  }
+
 
   description
     "Bla bla...";
@@ -30,17 +35,10 @@ module svi_verify_example {
       tailf:cli-allow-range;
       type string;
     }
-
+    // gives us linkage to selftest
+    uses selftest:selftest-result;
     uses ncs:service-data;
     ncs:servicepoint svi_verify_example-servicepoint;
-
-    // may replace this with other ways of refering to the devices.
-    // leaf-list device {
-    //   type leafref {
-    //     path "/ncs:devices/ncs:device/ncs:name";
-    //   }
-    // }
-
   
    list switches {
         key "id";
@@ -68,12 +66,15 @@ module svi_verify_example {
           }
         }
       }
+      
+      leaf vlan-id {
+        type uint16;
+        mandatory true;
+      }
+      leaf vlan-name{
+        type string;
+        mandatory true;
+      }
 
-
-
-    // // replace with your own stuff here
-    // leaf dummy {
-    //   type inet:ipv4-address;
-    // }
   }
 }

@@ -541,3 +541,7 @@ developer@ncs#
 ```
 
 Note that the `test-svi-fail` test which was designed to fail, did indeed fail since the IP address `172.16.110.2` was not provisioned for this service, but the `172.16.107.2` one was and it passed. 
+
+## Related Sandbox
+
+[Reserve the NSO Reservable Sandbox](https://devnetsandbox.cisco.com/RM/Diagram/Index/43964e62-a13c-4929-bde7-a2f68ad6b27c?diagramType=Topology)
